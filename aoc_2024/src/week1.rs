@@ -1,4 +1,5 @@
 use std::{ collections::HashMap, fs };
+use regex::{Regex, Match};
 
 fn insert_str_as_int_in_order(ordered_vec: &mut Vec<i32>, new_item: &str) {
     let parsed = new_item.parse::<i32>().unwrap();
@@ -193,4 +194,45 @@ pub fn day2() {
     assert!(num_dampened_safe_reports + num_safe_reports > 552);
 
     ()
+}
+
+pub fn day3() {
+    let lines = read_input_as_lines("day3_input.txt");
+    let input = lines.join("");
+    let mul_regex = Regex::new(r"mul\(\d{1,3},\d{1,3}\)").unwrap();
+    // let inner_regex = Regex::new(r"\d{1,3}").unwrap();
+    fn multiply_match(m: Match<'_>) -> i32 {
+        let raw: &str = m.as_str();
+        // TODO:: this is a pain in the ass to turn in to a constant available outside fn ref so oh well, eat it performance
+        let inner_regex = Regex::new(r"\d{1,3}").unwrap();
+        inner_regex.find_iter(raw).fold(1, |result, m| {
+            result * m.as_str().parse::<i32>().unwrap()
+        })
+    }
+
+    let multiplied_values = mul_regex.find_iter(&input).map(multiply_match);
+
+    struct OperationalHoldover {
+        doing: bool,
+        total: i32
+    }
+
+    // TODO / another option: Named capture matches? But, maybe more complicated than its worth...
+    let doanddont_regex = Regex::new(r"(mul\(\d{1,3},\d{1,3}\))|(do\(\))|(don't\(\))").unwrap();
+    let multipled_values_with_holdover = doanddont_regex.find_iter(&input).fold(OperationalHoldover{doing: true, total: 0}, |holdover, m| {
+        let raw: &str = m.as_str();
+        match raw {
+            "do()" => OperationalHoldover {doing: true, total: holdover.total},
+            "don't()" => OperationalHoldover {doing: false, total: holdover.total},
+            _ => match holdover.doing {
+                true => OperationalHoldover { doing: true, total: holdover.total + multiply_match(m)},
+                false => holdover
+            }
+        }
+    });
+
+    let part_1_sum = multiplied_values.sum::<i32>();
+    println!("Part 1 (sum of mults): {}", part_1_sum);
+    assert_eq!(part_1_sum, 166630675);
+    println!("Part 2 (do's and don'ts): {}", multipled_values_with_holdover.total)
 }
