@@ -1,4 +1,4 @@
-use std::{ collections::HashMap, fs, result, slice::Iter };
+use std::{ collections::HashMap, fs, hash::Hash, result, slice::Iter, usize };
 use regex::{ Regex, Match };
 
 fn insert_str_as_int_in_order(ordered_vec: &mut Vec<i32>, new_item: &str) {
@@ -542,7 +542,13 @@ pub fn day4_part2() {
         let maybe_origin = grid.get_cell(origin);
 
         if
-            let (Some(top_left), Some(top_right), Some(bottom_left), Some(bottom_right), Some(origin_node)) = (
+            let (
+                Some(top_left),
+                Some(top_right),
+                Some(bottom_left),
+                Some(bottom_right),
+                Some(origin_node),
+            ) = (
                 maybe_top_left,
                 maybe_top_right,
                 maybe_bottom_left,
@@ -550,17 +556,25 @@ pub fn day4_part2() {
                 maybe_origin,
             )
         {
-            let forward_diag: String = vec![top_left.letter, origin_node.letter, bottom_right.letter].into_iter().collect();
-            let back_diag: String = vec![bottom_left.letter, origin_node.letter, top_right.letter].into_iter().collect();
-            let forward_hit = forward_diag == String::from("MAS") || forward_diag == String::from("SAM");
+            let forward_diag: String = vec![
+                top_left.letter,
+                origin_node.letter,
+                bottom_right.letter
+            ]
+                .into_iter()
+                .collect();
+            let back_diag: String = vec![bottom_left.letter, origin_node.letter, top_right.letter]
+                .into_iter()
+                .collect();
+            let forward_hit =
+                forward_diag == String::from("MAS") || forward_diag == String::from("SAM");
             let back_hit = back_diag == String::from("MAS") || back_diag == String::from("SAM");
 
             match (back_hit, forward_hit) {
                 (true, true) => 1,
-                _ => 0
-            }   
-        }
-        else {
+                _ => 0,
+            }
+        } else {
             0
         }
     }
@@ -578,4 +592,89 @@ pub fn day4_part2() {
     }
     println!("Day 4 Part 2 (X-MAS): {}", count);
     assert_eq!(count, 1902)
+}
+
+pub fn day5() {
+    #[derive(Clone, Copy, Debug)]
+    struct PageRule {
+        first: usize,
+        second: usize,
+    }
+
+    let mut rules: HashMap<usize, Vec<PageRule>> = HashMap::new();
+
+    let lines = read_input_as_lines("day5_input.txt");
+    // Line that input switches over
+    // let input_pivot = 1177;
+    let input_pivot = 22;
+    let (rules_input, printer_input) = lines.split_at(input_pivot);
+
+    rules_input
+        .into_iter()
+        .filter(|line| !line.is_empty())
+        .for_each(|line| {
+            let (first_raw, second_raw) = line.split_once("|").unwrap();
+            let first = first_raw.parse::<usize>().unwrap();
+            let second = second_raw.parse::<usize>().unwrap();
+            match rules.get_mut(&first) {
+                Some(ruleset) => ruleset.push(PageRule { first, second }),
+                _ => {
+                    rules.insert(first, vec![PageRule { first, second }]);
+                }
+            };
+        });
+
+    let correct_rows: Vec<Vec<usize>> = printer_input.into_iter().filter_map(|line| {
+        let pages: Vec<usize> = line
+            .split(",")
+            .map(|raw| raw.parse::<usize>().unwrap())
+            .collect();
+        let correct = pages
+            .iter()
+            .enumerate()
+            .fold(true, |is_correct, (index, page)| {
+                // println!("index: {}, page: {}", index, page);
+                let page_rules = rules.get(&page);
+                page_rules
+                    .map(|rules| {
+                        rules.into_iter().fold(Vec::new(), |page_follows_rules, rule| {
+                            // Todo:: Find index of all 'second' rule nums; ensure they are > than max of left index
+                            // fold to true if all ok; abort quick on f1alse.
+                            let must_follow_indexes = pages
+                                .iter()
+                                .rposition(|item| item == &rule.second)
+                                .map(|found_index| {
+                                    // println!("rule: {:?}, found: {:?}", rule, found_index);
+                                    let res = found_index > index;
+                                    if !res {
+                                        println!("failed validation -- row: {:?}, rule: {:?}, validation: {}", pages.clone(), rule, res);
+                                    }
+                                    res
+                                });
+                            let next_init = page_follows_rules && must_follow_indexes.unwrap_or(true);
+                            println!("{:?} {:?}~{} - {:?} {:?}", must_follow_indexes.unwrap_or(true), page_follows_rules, next_init, rule, pages.clone());
+                            next_init
+                        })
+                    })
+                    .unwrap_or(true)
+            });
+        if correct {
+            println!("Correct!: {:?}", pages.clone());
+            Some(pages)
+        } else {
+            None
+        }
+    }).collect();
+    let just_rows: Vec<Vec<usize>> = correct_rows.clone();
+    println!("correct rows {:?}", just_rows);
+
+    let correct_mids = correct_rows.into_iter().filter_map(|row| {
+        let mid_val = row.get(row.len() / 2);
+        mid_val.map(|x| x.clone())
+    });
+
+    let just_mids: Vec<usize> = correct_mids.clone().collect();
+    println!("correct mids: {:?}", just_mids);
+    let sum_mids: usize = correct_mids.sum();
+    println!("Part 1 (Sum of Mids): {}", sum_mids);
 }
