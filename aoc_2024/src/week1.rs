@@ -1,5 +1,5 @@
 use std::{ collections::HashMap, fs, result, slice::Iter };
-use regex::{Regex, Match};
+use regex::{ Regex, Match };
 
 fn insert_str_as_int_in_order(ordered_vec: &mut Vec<i32>, new_item: &str) {
     let parsed = new_item.parse::<i32>().unwrap();
@@ -205,31 +205,38 @@ pub fn day3() {
         let raw: &str = m.as_str();
         // TODO:: this is a pain in the ass to turn in to a constant available outside fn ref so oh well, eat it performance
         let inner_regex = Regex::new(r"\d{1,3}").unwrap();
-        inner_regex.find_iter(raw).fold(1, |result, m| {
-            result * m.as_str().parse::<i32>().unwrap()
-        })
+        inner_regex
+            .find_iter(raw)
+            .fold(1, |result, m| { result * m.as_str().parse::<i32>().unwrap() })
     }
 
     let multiplied_values = mul_regex.find_iter(&input).map(multiply_match);
 
     struct OperationalHoldover {
         doing: bool,
-        total: i32
+        total: i32,
     }
 
     // TODO / another option: Named capture matches? But, maybe more complicated than its worth...
     let doanddont_regex = Regex::new(r"(mul\(\d{1,3},\d{1,3}\))|(do\(\))|(don't\(\))").unwrap();
-    let multipled_values_with_holdover = doanddont_regex.find_iter(&input).fold(OperationalHoldover{doing: true, total: 0}, |holdover, m| {
-        let raw: &str = m.as_str();
-        match raw {
-            "do()" => OperationalHoldover {doing: true, total: holdover.total},
-            "don't()" => OperationalHoldover {doing: false, total: holdover.total},
-            _ => match holdover.doing {
-                true => OperationalHoldover { doing: true, total: holdover.total + multiply_match(m)},
-                false => holdover
+    let multipled_values_with_holdover = doanddont_regex
+        .find_iter(&input)
+        .fold(OperationalHoldover { doing: true, total: 0 }, |holdover, m| {
+            let raw: &str = m.as_str();
+            match raw {
+                "do()" => OperationalHoldover { doing: true, total: holdover.total },
+                "don't()" => OperationalHoldover { doing: false, total: holdover.total },
+                _ =>
+                    match holdover.doing {
+                        true =>
+                            OperationalHoldover {
+                                doing: true,
+                                total: holdover.total + multiply_match(m),
+                            },
+                        false => holdover,
+                    }
             }
-        }
-    });
+        });
 
     let part_1_sum = multiplied_values.sum::<i32>();
     println!("Part 1 (sum of mults): {}", part_1_sum);
@@ -237,87 +244,338 @@ pub fn day3() {
     println!("Part 2 (do's and don'ts): {}", multipled_values_with_holdover.total)
 }
 
-pub fn day4() {
+const XMAS: &str = "XMAS";
+pub fn _day4_snake() {
     let lines = read_input_as_lines("day4_input.txt");
-
     #[derive(Clone, Copy, Debug)]
     struct Node {
         letter: char,
-        visited: bool
+        visited: bool,
     }
 
     #[derive(Clone, Debug)]
     struct Grid {
         max_x: i32,
         max_y: i32,
-        cells: Vec<Vec<Node>>
+        cells: Vec<Vec<Node>>,
     }
     let cells: Vec<Vec<Node>> = lines
-    .into_iter()
-    .map(|row: String| {
-        // Each row becomes its own vector of usize, for following calculations
-        row.chars()
-            .map(|letter: char| Node{letter: letter, visited: false})
-            .collect()
-    })
-    .filter(|report: &Vec<Node>| report.len() > 0)
-    .collect();
+        .into_iter()
+        .map(|row: String| {
+            // Each row becomes its own vector of usize, for following calculations
+            row.chars()
+                .map(|letter: char| Node { letter: letter, visited: false })
+                .collect()
+        })
+        .filter(|report: &Vec<Node>| report.len() > 0)
+        .collect();
 
-    let grid_height: i32 = (cells.len() - 1) as i32;
-    let grid_width: i32 = (cells.first().unwrap().len() - 1) as i32;
+    let grid_height: i32 = (cells.len() as i32) - 1;
+    let grid_width: i32 = (cells.first().unwrap().len() as i32) - 1;
 
     let grid = Grid {
         max_x: grid_height,
         max_y: grid_width,
-        cells: cells
+        cells: cells,
     };
 
     // The Crawl: Append <the crawl> to the end of the string  (4 chars), return a list of crawls
-    fn build_fourpairs(grid: Grid, current_node: (i32, i32), current_word: String) -> Vec<String>{
+    fn build_fourpairs(grid: Grid, current_node: (i32, i32), current_word: String) -> Vec<String> {
+        println!("{}", current_word);
         let mut adjacent_nodes: Vec<(usize, usize)> = Vec::new();
         let (x, y) = current_node;
-        let current_cell = grid.cells.get(y as usize).map(|row| row.get(x as usize)).flatten();
-        current_cell.map(|node| {
-            match node.visited {
-                true => None,
-                false => {
-                    let mut inner_grid = grid.clone();
-                    inner_grid.cells[y as usize][x as usize] = Node {
-                        letter: node.letter,
-                        visited: true
-                    };
-                    let mut new_word = current_word.to_owned();
-                    new_word.push(node.letter);
-                    let mut results: Vec<String> = Vec::new();
-                    match new_word.len() {
-                        4 => results.append(Vec::from([new_word]).as_mut()),
-                        _ => {
-                            
-                            for y_offset in -1..1 {
-                                let new_y = y + y_offset;
-                                if 0 <= new_y && new_y <= grid.max_y {
-                                    for x_offset in -1..1 {
-                                        let new_x = x + x_offset;
-                                        results.append(build_fourpairs(inner_grid.clone(), (new_x, new_y), new_word.clone()).as_mut())
+        let current_cell = grid.cells
+            .get(y as usize)
+            .map(|row| row.get(x as usize))
+            .flatten();
+        current_cell
+            .map(|node| {
+                match node.visited {
+                    true => None,
+                    false => {
+                        let mut inner_grid = grid.clone();
+                        inner_grid.cells[y as usize][x as usize] = Node {
+                            letter: node.letter,
+                            visited: true,
+                        };
+                        let mut new_word = current_word.to_owned();
+                        new_word.push(node.letter);
+                        if XMAS.starts_with(&new_word) {
+                            let mut results: Vec<String> = Vec::new();
+                            match new_word.len() {
+                                4 => results.append(Vec::from([new_word]).as_mut()),
+                                _ => {
+                                    for y_offset in -1..=1 {
+                                        let new_y = y + y_offset;
+                                        if 0 <= new_y && new_y <= grid.max_y {
+                                            for x_offset in -1..=1 {
+                                                let new_x = x + x_offset;
+                                                results.append(
+                                                    build_fourpairs(
+                                                        inner_grid.clone(),
+                                                        (new_x, new_y),
+                                                        new_word.clone()
+                                                    ).as_mut()
+                                                );
+                                            }
+                                        }
                                     }
                                 }
-                            };
+                            }
+                            Some(results)
+                        } else {
+                            None
                         }
                     }
-                    Some(results)
                 }
-            }
-        }).flatten().unwrap_or(Vec::new())
+            })
+            .flatten()
+            .unwrap_or(Vec::new())
     }
 
     let mut all_words: Vec<String> = Vec::new();
-    for y in 0..grid_width {
-        for x in 0..grid_height {
+    for y in 0..=grid_height {
+        for x in 0..=grid_width {
             let grid_iteration = grid.clone();
             all_words.append(build_fourpairs(grid_iteration, (x, y), String::new()).as_mut());
         }
     }
 
-    let count_xmas = all_words.into_iter().filter(|word| *word == String::from("XMAS")).count();
+    let count_xmas = all_words
+        .into_iter()
+        .filter(|word| *word == String::from("XMAS"))
+        .count();
     println!("Part 1 (count all xmas): {}", count_xmas)
+}
+
+enum Direction {
+    N,
+    NE,
+    E,
+    SE,
+    S,
+    SW,
+    W,
+    NW,
+}
+impl Direction {
+    fn coord_shift(&self) -> (i32, i32) {
+        match *self {
+            Direction::N => (0, 1),
+            Direction::NE => (1, 1),
+            Direction::E => (1, 0),
+            Direction::SE => (1, -1),
+            Direction::S => (0, -1),
+            Direction::SW => (-1, -1),
+            Direction::W => (-1, 0),
+            Direction::NW => (-1, 1),
+        }
+    }
+    fn jump_cell(&self, origin: (i32, i32)) -> (i32, i32) {
+        let (origin_x, origin_y) = origin;
+        let (modify_x, modify_y) = self.coord_shift();
+        (origin_x + modify_x, origin_y + modify_y)
+    }
+    pub fn iterator() -> Iter<'static, Direction> {
+        static DIRECTIONS: [Direction; 8] = [
+            Direction::N,
+            Direction::NE,
+            Direction::E,
+            Direction::SE,
+            Direction::S,
+            Direction::SW,
+            Direction::W,
+            Direction::NW,
+        ];
+        DIRECTIONS.iter()
+    }
+}
+#[derive(Clone, Copy, Debug)]
+struct Node {
+    letter: char,
+    visited: bool,
+}
+
+#[derive(Clone, Debug)]
+struct Grid {
+    _max_x: i32,
+    _max_y: i32,
+    cells: Vec<Vec<Node>>,
+}
+
+impl Grid {
+    fn get_cell(&self, position: (i32, i32)) -> Option<&Node> {
+        let (x, y) = position;
+        let x = self.cells
+            .get(y as usize)
+            .map(|row| row.get(x as usize))
+            .flatten();
+
+        x
+    }
+}
+pub fn day4() {
+    let lines = read_input_as_lines("day4_input.txt");
+    let cells: Vec<Vec<Node>> = lines
+        .into_iter()
+        .map(|row: String| {
+            // Each row becomes its own vector of usize, for following calculations
+            row.chars()
+                .map(|letter: char| Node { letter: letter, visited: false })
+                .collect()
+        })
+        .filter(|report: &Vec<Node>| report.len() > 0)
+        .collect();
+
+    let grid_height: i32 = (cells.len() as i32) - 1;
+    let grid_width: i32 = (cells.first().unwrap().len() as i32) - 1;
+
+    let grid = Grid {
+        _max_x: grid_height,
+        _max_y: grid_width,
+        cells: cells,
+    };
+
+    // The Crawl: Append <the crawl> to the end of the string  (4 chars), return a list of crawls
+    fn build_fourpairs(
+        grid: Grid,
+        current_node: (i32, i32),
+        current_word: String,
+        direction: &Direction
+    ) -> Vec<String> {
+        let (x, y) = current_node;
+        let current_cell = grid.get_cell(current_node);
+        current_cell
+            .map(|node| {
+                match node.visited {
+                    true => None,
+                    false => {
+                        let mut inner_grid = grid.clone();
+                        inner_grid.cells[y as usize][x as usize] = Node {
+                            letter: node.letter,
+                            visited: true,
+                        };
+                        let mut new_word = current_word.to_owned();
+                        new_word.push(node.letter);
+                        if XMAS.starts_with(&new_word) {
+                            let mut results: Vec<String> = Vec::new();
+                            match new_word.len() {
+                                4 => results.append(Vec::from([new_word]).as_mut()),
+                                _ => {
+                                    let (x_offset, y_offset) = direction.coord_shift();
+                                    let new_y = y + y_offset;
+                                    let new_x = x + x_offset;
+                                    results.append(
+                                        build_fourpairs(
+                                            inner_grid.clone(),
+                                            (new_x, new_y),
+                                            new_word.clone(),
+                                            direction
+                                        ).as_mut()
+                                    );
+                                }
+                            }
+                            Some(results)
+                        } else {
+                            None
+                        }
+                    }
+                }
+            })
+            .flatten()
+            .unwrap_or(Vec::new())
+    }
+
+    let mut all_words: Vec<String> = Vec::new();
+    for y in 0..=grid_height {
+        for x in 0..=grid_width {
+            Direction::iterator().for_each(|direction| {
+                let grid_iteration = grid.clone();
+                all_words.append(
+                    build_fourpairs(grid_iteration, (x, y), String::new(), direction).as_mut()
+                );
+            });
+        }
+    }
+
+    let count_xmas = all_words
+        .into_iter()
+        .filter(|word| *word == String::from("XMAS"))
+        .count();
+    println!("Part 1 (count all xmas): {}", count_xmas);
+    assert_eq!(count_xmas, 2562);
+}
+
+pub fn day4_part2() {
+    let lines = read_input_as_lines("day4_input.txt");
+    let cells: Vec<Vec<Node>> = lines
+        .into_iter()
+        .map(|row: String| {
+            // Each row becomes its own vector of usize, for following calculations
+            row.chars()
+                .map(|letter: char| Node { letter: letter, visited: false })
+                .collect()
+        })
+        .filter(|report: &Vec<Node>| report.len() > 0)
+        .collect();
+
+    let grid_height: i32 = (cells.len() as i32) - 1;
+    let grid_width: i32 = (cells.first().unwrap().len() as i32) - 1;
+
+    let grid = Grid {
+        _max_x: grid_height,
+        _max_y: grid_width,
+        cells: cells,
+    };
+
+    fn build_crosses(grid: &Grid, origin: (i32, i32)) -> usize {
+        let (origin_x, origin_y) = origin;
+        let top_left_position = Direction::NW.jump_cell(origin);
+        let top_right_position = Direction::NE.jump_cell(origin);
+        let bottom_left_position = Direction::SW.jump_cell(origin);
+        let bottom_right_position = Direction::SE.jump_cell(origin);
+
+        let maybe_top_left = grid.get_cell(top_left_position);
+        let maybe_top_right = grid.get_cell(top_right_position);
+        let maybe_bottom_left = grid.get_cell(bottom_left_position);
+        let maybe_bottom_right = grid.get_cell(bottom_right_position);
+        let maybe_origin = grid.get_cell(origin);
+
+        if
+            let (Some(top_left), Some(top_right), Some(bottom_left), Some(bottom_right), Some(origin_node)) = (
+                maybe_top_left,
+                maybe_top_right,
+                maybe_bottom_left,
+                maybe_bottom_right,
+                maybe_origin,
+            )
+        {
+            let forward_diag: String = vec![top_left.letter, origin_node.letter, bottom_right.letter].into_iter().collect();
+            let back_diag: String = vec![bottom_left.letter, origin_node.letter, top_right.letter].into_iter().collect();
+            let forward_hit = forward_diag == String::from("MAS") || forward_diag == String::from("SAM");
+            let back_hit = back_diag == String::from("MAS") || back_diag == String::from("SAM");
+
+            match (back_hit, forward_hit) {
+                (true, true) => 1,
+                _ => 0
+            }   
+        }
+        else {
+            0
+        }
+    }
+
+    let mut count: usize = 0;
+    for y in 0..=grid_height {
+        for x in 0..=grid_width {
+            let position = (x, y);
+            let maybe_cell = grid.get_cell(position);
+            if let Some(Node { letter: 'A', visited: _ }) = maybe_cell {
+                // Only look for crosses if the origin node is an M
+                count += build_crosses(&grid, position);
+            }
+        }
+    }
+    println!("Day 4 Part 2 (X-MAS): {}", count);
+    assert_eq!(count, 1902)
 }
