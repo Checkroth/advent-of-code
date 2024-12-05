@@ -1,4 +1,4 @@
-use std::{ collections::HashMap, fs };
+use std::{ collections::HashMap, fs, result, slice::Iter };
 use regex::{Regex, Match};
 
 fn insert_str_as_int_in_order(ordered_vec: &mut Vec<i32>, new_item: &str) {
@@ -235,4 +235,89 @@ pub fn day3() {
     println!("Part 1 (sum of mults): {}", part_1_sum);
     assert_eq!(part_1_sum, 166630675);
     println!("Part 2 (do's and don'ts): {}", multipled_values_with_holdover.total)
+}
+
+pub fn day4() {
+    let lines = read_input_as_lines("day4_input.txt");
+
+    #[derive(Clone, Copy, Debug)]
+    struct Node {
+        letter: char,
+        visited: bool
+    }
+
+    #[derive(Clone, Debug)]
+    struct Grid {
+        max_x: i32,
+        max_y: i32,
+        cells: Vec<Vec<Node>>
+    }
+    let cells: Vec<Vec<Node>> = lines
+    .into_iter()
+    .map(|row: String| {
+        // Each row becomes its own vector of usize, for following calculations
+        row.chars()
+            .map(|letter: char| Node{letter: letter, visited: false})
+            .collect()
+    })
+    .filter(|report: &Vec<Node>| report.len() > 0)
+    .collect();
+
+    let grid_height: i32 = (cells.len() - 1) as i32;
+    let grid_width: i32 = (cells.first().unwrap().len() - 1) as i32;
+
+    let grid = Grid {
+        max_x: grid_height,
+        max_y: grid_width,
+        cells: cells
+    };
+
+    // The Crawl: Append <the crawl> to the end of the string  (4 chars), return a list of crawls
+    fn build_fourpairs(grid: Grid, current_node: (i32, i32), current_word: String) -> Vec<String>{
+        let mut adjacent_nodes: Vec<(usize, usize)> = Vec::new();
+        let (x, y) = current_node;
+        let current_cell = grid.cells.get(y as usize).map(|row| row.get(x as usize)).flatten();
+        current_cell.map(|node| {
+            match node.visited {
+                true => None,
+                false => {
+                    let mut inner_grid = grid.clone();
+                    inner_grid.cells[y as usize][x as usize] = Node {
+                        letter: node.letter,
+                        visited: true
+                    };
+                    let mut new_word = current_word.to_owned();
+                    new_word.push(node.letter);
+                    let mut results: Vec<String> = Vec::new();
+                    match new_word.len() {
+                        4 => results.append(Vec::from([new_word]).as_mut()),
+                        _ => {
+                            
+                            for y_offset in -1..1 {
+                                let new_y = y + y_offset;
+                                if 0 <= new_y && new_y <= grid.max_y {
+                                    for x_offset in -1..1 {
+                                        let new_x = x + x_offset;
+                                        results.append(build_fourpairs(inner_grid.clone(), (new_x, new_y), new_word.clone()).as_mut())
+                                    }
+                                }
+                            };
+                        }
+                    }
+                    Some(results)
+                }
+            }
+        }).flatten().unwrap_or(Vec::new())
+    }
+
+    let mut all_words: Vec<String> = Vec::new();
+    for y in 0..grid_width {
+        for x in 0..grid_height {
+            let grid_iteration = grid.clone();
+            all_words.append(build_fourpairs(grid_iteration, (x, y), String::new()).as_mut());
+        }
+    }
+
+    let count_xmas = all_words.into_iter().filter(|word| *word == String::from("XMAS")).count();
+    println!("Part 1 (count all xmas): {}", count_xmas)
 }
