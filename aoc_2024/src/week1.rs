@@ -377,6 +377,17 @@ impl Direction {
         let (modify_x, modify_y) = self.coord_shift();
         (origin_x + modify_x, origin_y + modify_y)
     }
+
+    fn rotate_90(&self) -> Option<Direction> {
+        // This could probably be done with iterator followed by rotate_left or right, but opting not to do that for now.
+        match self {
+            Direction::N => Some(Direction::E),
+            Direction::E => Some(Direction::S),
+            Direction::S => Some(Direction::W),
+            Direction::W => Some(Direction::N),
+            _ => None
+        }
+    }
     pub fn iterator() -> Iter<'static, Direction> {
         static DIRECTIONS: [Direction; 8] = [
             Direction::N,
@@ -716,6 +727,41 @@ pub fn day5() {
     println!("Part 2 (Sum of Fixed Incorrect Mids): {}", sum_incorrect_mids);
 }
 
-fn day6() {
+pub fn day6() {
+    let mut map = Grid::build_from_file("day6_input.txt");
+    let start_position = map.cells.iter().enumerate().fold(None, |guard_position, (guard_y_position, row)| {
+        let guard_x_position = row.iter().position(|x| x.letter == '^');
+        match (guard_position, guard_x_position) {
+            (None, Some(x)) => Some((x as i32, guard_y_position as i32)),
+            (Some(pos), _) => Some(pos),
+            _ => None
+        }
+    }).unwrap();
 
+    fn traverse_map(mut map: Grid, direction: Direction, position: (i32, i32)) {
+        let next_position = direction.jump_cell(position);
+        let (next_node_x, next_node_y) = next_position;
+        let next_node = map.get_cell(next_position);
+        match next_node {
+            Some(Node { letter: '#', visited: _}) => {
+                traverse_map(map, direction.rotate_90().unwrap(), position);
+            },
+            Some(node) => {
+                map.cells[next_node_y as usize][next_node_x as usize] = Node {
+                    letter: node.letter,
+                    visited: true,
+                };
+                traverse_map(map, direction, next_position);
+            }
+            None => {
+                // End of the recursion -- we've left the map!
+                ()
+            }
+        }
+    }
+    traverse_map(map, Direction::N, start_position);
+
+    let sum_visited_cells = map.cells.into_iter().fold(0, |total, row| {
+        total + row.iter().filter(|n| n.visited).count()
+    });
 }
