@@ -1,5 +1,6 @@
 use std::{ collections::HashMap, fs, hash::Hash, result, slice::Iter, usize };
 use regex::{ Regex, Match };
+use std::cmp::Ordering;
 
 fn insert_str_as_int_in_order(ordered_vec: &mut Vec<i32>, new_item: &str) {
     let parsed = new_item.parse::<i32>().unwrap();
@@ -404,6 +405,29 @@ struct Grid {
 }
 
 impl Grid {
+    pub fn build_from_file(filename: &str) -> Grid {
+        let lines = read_input_as_lines("day4_input.txt");
+        let cells: Vec<Vec<Node>> = lines
+            .into_iter()
+            .map(|row: String| {
+                // Each row becomes its own vector of usize, for following calculations
+                row.chars()
+                    .map(|letter: char| Node { letter: letter, visited: false })
+                    .collect()
+            })
+            .filter(|report: &Vec<Node>| report.len() > 0)
+            .collect();
+    
+        let grid_height: i32 = (cells.len() as i32) - 1;
+        let grid_width: i32 = (cells.first().unwrap().len() as i32) - 1;
+    
+        Grid {
+            _max_x: grid_height,
+            _max_y: grid_width,
+            cells: cells,
+        }
+    }
+    
     fn get_cell(&self, position: (i32, i32)) -> Option<&Node> {
         let (x, y) = position;
         let x = self.cells
@@ -605,8 +629,8 @@ pub fn day5() {
 
     let lines = read_input_as_lines("day5_input.txt");
     // Line that input switches over
-    // let input_pivot = 1177;
-    let input_pivot = 22;
+    let input_pivot = 1177;
+    // let input_pivot = 22;
     let (rules_input, printer_input) = lines.split_at(input_pivot);
 
     rules_input
@@ -624,57 +648,112 @@ pub fn day5() {
             };
         });
 
-    let correct_rows: Vec<Vec<usize>> = printer_input.into_iter().filter_map(|line| {
-        let pages: Vec<usize> = line
-            .split(",")
-            .map(|raw| raw.parse::<usize>().unwrap())
-            .collect();
-        let correct = pages
+    fn row_is_correct(rules: &HashMap<usize, Vec<PageRule>>, pages: &Vec<usize>) -> bool {
+        // curried just so we can get the hashmap without having to pass it around :shrug:
+        pages
             .iter()
             .enumerate()
             .fold(true, |is_correct, (index, page)| {
-                // println!("index: {}, page: {}", index, page);
                 let page_rules = rules.get(&page);
                 page_rules
                     .map(|rules| {
-                        rules.into_iter().fold(Vec::new(), |page_follows_rules, rule| {
-                            // Todo:: Find index of all 'second' rule nums; ensure they are > than max of left index
-                            // fold to true if all ok; abort quick on f1alse.
-                            let must_follow_indexes = pages
-                                .iter()
-                                .rposition(|item| item == &rule.second)
-                                .map(|found_index| {
-                                    // println!("rule: {:?}, found: {:?}", rule, found_index);
-                                    let res = found_index > index;
-                                    if !res {
-                                        println!("failed validation -- row: {:?}, rule: {:?}, validation: {}", pages.clone(), rule, res);
-                                    }
-                                    res
-                                });
-                            let next_init = page_follows_rules && must_follow_indexes.unwrap_or(true);
-                            println!("{:?} {:?}~{} - {:?} {:?}", must_follow_indexes.unwrap_or(true), page_follows_rules, next_init, rule, pages.clone());
-                            next_init
-                        })
+                        rules
+                            .into_iter()
+                            .map(|rule| {
+                                // Todo:: Find index of all 'second' rule nums; ensure they are > than max of left index
+                                // fold to true if all ok; abort quick on f1alse.
+                                let must_follow_indexes = pages
+                                    .iter()
+                                    .rposition(|item| item == &rule.second)
+                                    .map(|found_index| { found_index > index });
+                                match must_follow_indexes {
+                                    Some(true) => true,
+                                    Some(false) => false,
+                                    None => true,
+                                }
+                            })
+                            .all(|x| x)
                     })
-                    .unwrap_or(true)
-            });
-        if correct {
-            println!("Correct!: {:?}", pages.clone());
-            Some(pages)
-        } else {
-            None
-        }
-    }).collect();
-    let just_rows: Vec<Vec<usize>> = correct_rows.clone();
-    println!("correct rows {:?}", just_rows);
+                    .unwrap_or(true) && is_correct
+            })
+    }
 
-    let correct_mids = correct_rows.into_iter().filter_map(|row| {
-        let mid_val = row.get(row.len() / 2);
-        mid_val.map(|x| x.clone())
+    let converted_rows: Vec<Vec<usize>> = printer_input
+        .into_iter()
+        .map(|line| {
+            let pages: Vec<usize> = line
+                .split(",")
+                .map(|raw| raw.parse::<usize>().unwrap())
+                .collect();
+            pages
+        })
+        .collect();
+
+    // This could be done in one swoop with the unstable feature drain_filter
+    let correct_rows: Vec<Vec<usize>> = converted_rows
+        .clone()
+        .into_iter()
+        .filter(|row| row_is_correct(&rules, row))
+        .collect();
+    let incorrect_rows: Vec<Vec<usize>> = converted_rows
+        .clone()
+        .into_iter()
+        .filter(|row| !row_is_correct(&rules, row))
+        .collect();
+    let fixed_rows = incorrect_rows.iter().map(|row| {
+        let mut fixed = row.clone();
+        fixed.sort_by(|left, right| {
+            let left_page_rules = rules.get(&left);
+            let right_page_rules = rules.get(&right);
+            if let Some(rules) = left_page_rules {
+                let relevant_left_rule = rules
+                    .iter()
+                    .filter(|rule| rule.second == *right)
+                    .next();
+                if relevant_left_rule.is_some() {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            } else if let Some(rules) = right_page_rules {
+                let relevant_right_rule = rules
+                    .iter()
+                    .filter(|rule| rule.second == *left)
+                    .next();
+                if relevant_right_rule.is_some() {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            } else {
+                Ordering::Less
+            }
+        });
+        fixed
     });
+
+
+    let correct_mids = correct_rows
+        .into_iter()
+        .filter_map(|row| { row.get(row.len() / 2).cloned() });
+
+    let fixed_incorrect_mids = fixed_rows
+        .into_iter()
+        .filter_map(|row| { row.get(row.len() / 2).cloned() });
+
+    // Get the incorrect rows, then fix and count them.
+    // It would be cleaner & more efficient to fix them in the first iteration (as well as collect correct & incorrect separately)
+    // which I'm only not doing because it's annoying and I don't care about performance
 
     let just_mids: Vec<usize> = correct_mids.clone().collect();
     println!("correct mids: {:?}", just_mids);
     let sum_mids: usize = correct_mids.sum();
-    println!("Part 1 (Sum of Mids): {}", sum_mids);
+    // let sum_incorrect_mids: usize = other_fixed.sum();
+    let sum_incorrect_mids: usize = fixed_incorrect_mids.sum();
+    println!("Part 1 (Sum of Correct Mids): {}", sum_mids);
+    println!("Part 2 (Sum of Fixed Incorrect Mids): {}", sum_incorrect_mids);
+}
+
+fn day6() {
+
 }
