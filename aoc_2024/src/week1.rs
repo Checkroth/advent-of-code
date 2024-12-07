@@ -399,14 +399,14 @@ struct Node {
 
 #[derive(Clone, Debug)]
 struct Grid {
-    _max_x: i32,
-    _max_y: i32,
+    height: i32,
+    width: i32,
     cells: Vec<Vec<Node>>,
 }
 
 impl Grid {
     pub fn build_from_file(filename: &str) -> Grid {
-        let lines = read_input_as_lines("day4_input.txt");
+        let lines = read_input_as_lines(filename);
         let cells: Vec<Vec<Node>> = lines
             .into_iter()
             .map(|row: String| {
@@ -422,8 +422,8 @@ impl Grid {
         let grid_width: i32 = (cells.first().unwrap().len() as i32) - 1;
     
         Grid {
-            _max_x: grid_height,
-            _max_y: grid_width,
+            height: grid_height,
+            width: grid_width,
             cells: cells,
         }
     }
@@ -439,26 +439,7 @@ impl Grid {
     }
 }
 pub fn day4() {
-    let lines = read_input_as_lines("day4_input.txt");
-    let cells: Vec<Vec<Node>> = lines
-        .into_iter()
-        .map(|row: String| {
-            // Each row becomes its own vector of usize, for following calculations
-            row.chars()
-                .map(|letter: char| Node { letter: letter, visited: false })
-                .collect()
-        })
-        .filter(|report: &Vec<Node>| report.len() > 0)
-        .collect();
-
-    let grid_height: i32 = (cells.len() as i32) - 1;
-    let grid_width: i32 = (cells.first().unwrap().len() as i32) - 1;
-
-    let grid = Grid {
-        _max_x: grid_height,
-        _max_y: grid_width,
-        cells: cells,
-    };
+    let grid = Grid::build_from_file("day4_input.txt");
 
     // The Crawl: Append <the crawl> to the end of the string  (4 chars), return a list of crawls
     fn build_fourpairs(
@@ -511,8 +492,8 @@ pub fn day4() {
     }
 
     let mut all_words: Vec<String> = Vec::new();
-    for y in 0..=grid_height {
-        for x in 0..=grid_width {
+    for y in 0..=grid.height {
+        for x in 0..=grid.width {
             Direction::iterator().for_each(|direction| {
                 let grid_iteration = grid.clone();
                 all_words.append(
@@ -531,26 +512,7 @@ pub fn day4() {
 }
 
 pub fn day4_part2() {
-    let lines = read_input_as_lines("day4_input.txt");
-    let cells: Vec<Vec<Node>> = lines
-        .into_iter()
-        .map(|row: String| {
-            // Each row becomes its own vector of usize, for following calculations
-            row.chars()
-                .map(|letter: char| Node { letter: letter, visited: false })
-                .collect()
-        })
-        .filter(|report: &Vec<Node>| report.len() > 0)
-        .collect();
-
-    let grid_height: i32 = (cells.len() as i32) - 1;
-    let grid_width: i32 = (cells.first().unwrap().len() as i32) - 1;
-
-    let grid = Grid {
-        _max_x: grid_height,
-        _max_y: grid_width,
-        cells: cells,
-    };
+    let grid = Grid::build_from_file("day4_input.txt");
 
     fn build_crosses(grid: &Grid, origin: (i32, i32)) -> usize {
         let (origin_x, origin_y) = origin;
@@ -604,8 +566,8 @@ pub fn day4_part2() {
     }
 
     let mut count: usize = 0;
-    for y in 0..=grid_height {
-        for x in 0..=grid_width {
+    for y in 0..=grid.height {
+        for x in 0..=grid.width {
             let position = (x, y);
             let maybe_cell = grid.get_cell(position);
             if let Some(Node { letter: 'A', visited: _ }) = maybe_cell {
