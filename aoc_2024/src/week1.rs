@@ -1,4 +1,4 @@
-use std::{ collections::HashMap, fs, hash::Hash, result, slice::Iter, usize };
+use std::{ collections::HashMap, f32::consts::E, fs, hash::Hash, result, slice::Iter, usize };
 use regex::{ Regex, Match };
 use std::cmp::Ordering;
 
@@ -349,6 +349,7 @@ pub fn _day4_snake() {
     println!("Part 1 (count all xmas): {}", count_xmas)
 }
 
+#[derive(Clone, Debug)]
 enum Direction {
     N,
     NE,
@@ -362,14 +363,14 @@ enum Direction {
 impl Direction {
     fn coord_shift(&self) -> (i32, i32) {
         match *self {
-            Direction::N => (0, 1),
-            Direction::NE => (1, 1),
+            Direction::N => (0, -1),
+            Direction::NE => (1, -1),
             Direction::E => (1, 0),
-            Direction::SE => (1, -1),
-            Direction::S => (0, -1),
-            Direction::SW => (-1, -1),
+            Direction::SE => (1, 1),
+            Direction::S => (0, 1),
+            Direction::SW => (-1, 1),
             Direction::W => (-1, 0),
-            Direction::NW => (-1, 1),
+            Direction::NW => (-1, -1),
         }
     }
     fn jump_cell(&self, origin: (i32, i32)) -> (i32, i32) {
@@ -737,18 +738,24 @@ pub fn day6() {
             _ => None
         }
     }).unwrap();
+    println!("Start position: {:?}", start_position);
+    println!("Starting Cell: {:?}", map.get_cell(start_position));
+    let (start_x, start_y) = start_position;
+    // Consider the starting node as already visited
+    map.cells[start_y as usize][start_x as usize] = Node { letter: '^', visited: true };
 
-    fn traverse_map(mut map: Grid, direction: Direction, position: (i32, i32)) {
+    fn traverse_map(map: &mut Grid, direction: Direction, position: (i32, i32)) {
         let next_position = direction.jump_cell(position);
         let (next_node_x, next_node_y) = next_position;
         let next_node = map.get_cell(next_position);
+        // println!("Going from {:?} to {:?} with direction {:?}", position, next_node, direction);
         match next_node {
             Some(Node { letter: '#', visited: _}) => {
                 traverse_map(map, direction.rotate_90().unwrap(), position);
             },
             Some(node) => {
                 map.cells[next_node_y as usize][next_node_x as usize] = Node {
-                    letter: node.letter,
+                    letter: 'X',
                     visited: true,
                 };
                 traverse_map(map, direction, next_position);
@@ -759,9 +766,72 @@ pub fn day6() {
             }
         }
     }
-    traverse_map(map, Direction::N, start_position);
+    traverse_map(&mut map, Direction::N, start_position);
+
+    fn traverse_will_loop(map: &Grid, direction: Direction, position: (i32, i32), origin: (i32, i32)) -> bool{
+        let next_position = direction.jump_cell(position);
+        match next_position {
+            origin => {
+                true
+            }
+            _ => {
+                let (next_node_x, next_node_y) = next_position;
+                let next_node = map.get_cell(next_position);
+        
+                match next_node {
+                    Some(Node { letter: '#', visited: _}) => {
+                        traverse_will_loop(map, direction.rotate_90().unwrap(), position, origin)
+                    },
+                    Some(node) => {
+                        traverse_will_loop(map, direction, next_position, origin)
+                    }
+                    None => {
+                        // End of the recursion -- we've left the map!
+                        false
+                    }
+                }
+        
+
+            }
+        }
+
+    }
+    
+    fn traverse_map_for_loops(map: &Grid, direction: Direction, position: (i32, i32)) -> Vec<(i32, i32)> {
+        // TODO:: This currently comes up with 6004 new blockers, which is considered "too high". There's a bug, somewhere.
+        let next_position = direction.jump_cell(position);
+        let (next_node_x, next_node_y) = next_position;
+        let next_node = map.get_cell(next_position);
+        println!("Going from {:?} to {:?} with direction {:?}", position, next_node, direction);
+        match next_node {
+            Some(Node { letter: '#', visited: _}) => {
+                // If it's already a blocker, we don't have to run a loop test.
+                traverse_map_for_loops(map, direction.rotate_90().unwrap(), position)
+            },
+            Some(node) => {
+                // This is where we could put a new obstruction to force us to go in circles
+                let potential_blocker = direction.jump_cell(next_position);
+                // TODO:: How to aggregate this? if will block: add the coordinates to a vector (that we can deduplicate later, 
+                //    in case the same position would cause a loop when approached from different directions?
+                let will_loop_if_blocked = traverse_will_loop(map, direction.rotate_90().unwrap(), next_position, next_position);
+                let extra_loops = traverse_map_for_loops(map, direction, next_position);
+                if will_loop_if_blocked {
+                    vec![potential_blocker].into_iter().chain(extra_loops.into_iter()).collect()
+                } else {
+                    extra_loops
+                }
+            }
+            None => {
+                Vec::new()
+            }
+        }
+    }
+
+    let looping_new_blockers = traverse_map_for_loops(&map, Direction::N, start_position);
 
     let sum_visited_cells = map.cells.into_iter().fold(0, |total, row| {
         total + row.iter().filter(|n| n.visited).count()
     });
-}
+    println!("Part 1 (sum of cells visited): {}", sum_visited_cells);
+    println!("Part 2 (number of potential infinite loop blockers: {}", looping_new_blockers.len());
+} 
