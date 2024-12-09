@@ -871,6 +871,7 @@ pub fn day6() {
 }
 
 pub fn day7() {
+    #[derive(Clone, Debug)]
     struct MaybeAnswerable {
         answer: i64,
         ordered_operatees: Vec<i64>
@@ -892,20 +893,28 @@ pub fn day7() {
     }).collect();
 
     // Recursive fold right to evaluate: The current index Plus or Times the calculated total of all indexes to its left, for each + and * multiple possible
+    fn visually_combine(left: i64, right: i64) -> i64 {
+        let mut string_repr = left.to_string();
+        string_repr.push_str(&right.to_string());
+        string_repr.parse().unwrap()
+    }
+
     fn calculate(ordered_operatees: Vec<i64>, prev: i64) -> Vec<i64>  {
         let mut operatee_iterator = ordered_operatees.into_iter();
         // There should be no empty operatee lists for this initial state.
         let start = operatee_iterator.next();
-        println!("Start {:?}", start);
         match start {
             Some(operatee) => {
                 let downstream: Vec<i64> = calculate(operatee_iterator.collect(), operatee);
-                println!("{:?} */+ downstream: {:?}", operatee, downstream);
+                // !("{:?} */+ downstream: {:?}", operatee, downstream);
                 if !downstream.is_empty() {
                     downstream
                         .clone()
                         .iter()
                         .map(|item| operatee + item)
+                        .chain(downstream.clone().iter()
+                            .map(|item| visually_combine(*item, operatee))
+                        )
                         .chain(downstream.into_iter()
                             .map(|item| operatee * item)
                         )
@@ -920,8 +929,8 @@ pub fn day7() {
         }
     }
     let correct_answers = maybe_answerables.iter().filter(|maybe_answerable| {
+        // println!("Processing {:?}", maybe_answerable);
         let answer_fold = maybe_answerable.ordered_operatees.clone().into_iter().rev().collect();
-        println!("Processing {:?}", answer_fold);
         let potential_answers = calculate(answer_fold, 0);
         potential_answers.into_iter().any(|answer| answer == maybe_answerable.answer)
     });
