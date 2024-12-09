@@ -12,7 +12,9 @@ fn main() {
     //week1::day4_part2();
     //println!("\nDay 5");
     //week1::day5();
-    println!("\nDay 6");
-    week1::day6();
+    //println!("\nDay 6");
+    //week1::day6();
+    println!("\nDay 7");
+    week1::day7();
     ()
 }

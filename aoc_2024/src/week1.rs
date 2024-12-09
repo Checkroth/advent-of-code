@@ -1,4 +1,4 @@
-use std::{ collections::HashMap, f32::consts::E, fs, hash::Hash, result, slice::Iter, usize };
+use std::{ collections::HashMap, f32::consts::E, fs, hash::Hash, iter, result, slice::Iter, usize };
 use regex::{ Regex, Match };
 use std::cmp::Ordering;
 
@@ -746,6 +746,7 @@ pub fn day6() {
     let (start_x, start_y) = start_position;
     // Consider the starting node as already visited
     map.cells[start_y as usize][start_x as usize] = Node { letter: '^', visited: true };
+    let p2_map = map.clone();
 
     fn traverse_map(map: &mut Grid, direction: Direction, position: (i32, i32)) {
         let next_position = direction.jump_cell(position);
@@ -826,9 +827,9 @@ pub fn day6() {
                 // If it's already a blocker, we don't have to run a loop test.
                 traverse_map_for_loops(map, direction.rotate_90().unwrap(), position)
             }
-            Some(node) => {
+            Some(_node) => {
                 // This is where we could put a new obstruction to force us to go in circles
-                let alternative_route = direction.rotate_90().unwrap();
+                let alternative_route = direction.clone().rotate_90().unwrap();
                 
                 let mut blocked_map = map.clone();
                 blocked_map.cells[next_node_y as usize][next_node_x as usize] = {
@@ -851,7 +852,7 @@ pub fn day6() {
         }
     }
 
-    let mut looping_new_blockers = traverse_map_for_loops(&map, Direction::N, start_position);
+    let mut looping_new_blockers = traverse_map_for_loops(&p2_map, Direction::N, start_position);
 
     let sum_visited_cells = map.cells.into_iter().fold(0, |total, row| {
         total +
@@ -864,6 +865,67 @@ pub fn day6() {
     looping_new_blockers.sort();
     println!("looping blockers {:?}", looping_new_blockers);
     looping_new_blockers.dedup();
+    // TODO:: Part 2 answer is still wrong. giving up after hours of bashing my head against the wall.
     println!("Part 1 (sum of cells visited): {}", sum_visited_cells);
-    println!("Part 2 (number of potential infinite loop blockers: {}", looping_new_blockers.len());
+    println!("Part 2 (number of potential infinite loop blockers: {})", looping_new_blockers.len());
+}
+
+pub fn day7() {
+    struct MaybeAnswerable {
+        answer: i64,
+        ordered_operatees: Vec<i64>
+    }
+    enum Operators {
+        Add,
+        Multiply
+    }
+    let maybe_answerables: Vec<MaybeAnswerable> = read_input_as_lines("day7_input.txt").into_iter().filter_map(|row| {
+        let split_row = row.split_once(": ");
+        if let Some((answer, operatees)) = split_row {
+            Some(MaybeAnswerable {
+                answer: answer.parse().unwrap(),
+                ordered_operatees: operatees.split_whitespace().map(|operatee| operatee.parse::<i64>().unwrap()).collect()
+            })
+        } else {
+            None
+        }
+    }).collect();
+
+    // Recursive fold right to evaluate: The current index Plus or Times the calculated total of all indexes to its left, for each + and * multiple possible
+    fn calculate(ordered_operatees: Vec<i64>, prev: i64) -> Vec<i64>  {
+        let mut operatee_iterator = ordered_operatees.into_iter();
+        // There should be no empty operatee lists for this initial state.
+        let start = operatee_iterator.next();
+        println!("Start {:?}", start);
+        match start {
+            Some(operatee) => {
+                let downstream: Vec<i64> = calculate(operatee_iterator.collect(), operatee);
+                println!("{:?} */+ downstream: {:?}", operatee, downstream);
+                if !downstream.is_empty() {
+                    downstream
+                        .clone()
+                        .iter()
+                        .map(|item| operatee + item)
+                        .chain(downstream.into_iter()
+                            .map(|item| operatee * item)
+                        )
+                        .collect()
+                } else {
+                    vec![operatee]
+                }
+            },
+            _ => {
+                Vec::new()
+            }
+        }
+    }
+    let correct_answers = maybe_answerables.iter().filter(|maybe_answerable| {
+        let answer_fold = maybe_answerable.ordered_operatees.clone().into_iter().rev().collect();
+        println!("Processing {:?}", answer_fold);
+        let potential_answers = calculate(answer_fold, 0);
+        potential_answers.into_iter().any(|answer| answer == maybe_answerable.answer)
+    });
+
+    let answerable_total = correct_answers.fold(0, |total, maybe_answerable| total + maybe_answerable.answer);
+    println!("Part 1 (Total from answerable rows): {}", answerable_total);
 }
