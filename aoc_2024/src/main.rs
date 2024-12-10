@@ -1,6 +1,7 @@
 mod utils;
 // mod week1;
 mod day8;
+mod day9;
 
 fn main() {
     //println!("Day 1");
@@ -18,7 +19,8 @@ fn main() {
     //week1::day6();
     // println!("\nDay 7");
     // week1::day7();
-    day8::part1();
-    day8::part2();
+    // day8::part1();
+    // day8::part2();
+    day9::part1();
     ()
 }
